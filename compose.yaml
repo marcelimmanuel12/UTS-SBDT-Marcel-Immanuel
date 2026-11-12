@@ -1,0 +1,83 @@
+services:
+  postgres-primary:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sbdt
+      POSTGRES_PASSWORD: sbdt_demo_password
+      POSTGRES_DB: sbdt
+      REPLICATION_PASSWORD: replica_demo_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command: ["postgres", "-c", "wal_level=replica", "-c", "max_wal_senders=10", "-c", "wal_keep_size=128MB", "-c", "max_replication_slots=10"]
+    volumes:
+      - primary_data:/var/lib/postgresql/data
+      - ./db/01-init-primary.sh:/docker-entrypoint-initdb.d/01-init-primary.sh:ro
+      - ./db/02-schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sbdt -d sbdt"]
+      interval: 5s
+      retries: 25
+    networks: [private_net]
+
+  postgres-replica:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      REPLICATION_PASSWORD: replica_demo_password
+    entrypoint: ["/bin/sh", "/scripts/start-replica.sh"]
+    volumes:
+      - replica_data:/var/lib/postgresql/data
+      - ./db/start-replica.sh:/scripts/start-replica.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sbdt -d sbdt"]
+      interval: 5s
+      retries: 25
+    networks: [private_net]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin_demo_password
+      KC_HOSTNAME: http://localhost:8080
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-sbdt.json:/opt/keycloak/data/import/realm-sbdt.json:ro
+    ports: ["127.0.0.1:8080:8080"]
+    networks: [private_net]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sbdt-api:local
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-replica:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    environment:
+      DB_USER: sbdt
+      DB_PASSWORD: sbdt_demo_password
+      DB_NAME: sbdt
+      DB_PRIMARY_HOST: postgres-primary
+      DB_REPLICA_HOST: postgres-replica
+      OIDC_ISSUER: http://localhost:8080/realms/sbdt
+      OIDC_JWKS_URL: http://keycloak:8080/realms/sbdt/protocol/openid-connect/certs
+      OIDC_AUDIENCE: api-service
+    ports: ["127.0.0.1:8000:8000"]
+    networks: [private_net]
+
+networks:
+  private_net:
+
+volumes:
+  primary_data:
+  replica_data:

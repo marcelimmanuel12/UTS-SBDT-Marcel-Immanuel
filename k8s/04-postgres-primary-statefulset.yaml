@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-primary
+  namespace: sbdt-uts
+spec:
+  serviceName: postgres-primary-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-primary
+  template:
+    metadata:
+      labels:
+        app: postgres-primary
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        args:
+        - -c
+        - wal_level=replica
+        - -c
+        - max_wal_senders=10
+        - -c
+        - max_replication_slots=10
+        - -c
+        - wal_keep_size=128MB
+        env:
+        - name: POSTGRES_USER
+          value: sbdt
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sbdt-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          value: sbdt
+        - name: REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sbdt-secrets
+              key: REPLICATION_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+        - name: primary-init
+          mountPath: /docker-entrypoint-initdb.d
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U sbdt -d sbdt
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 768Mi
+      volumes:
+      - name: primary-init
+        configMap:
+          name: pg-init
+          defaultMode: 493
+  volumeClaimTemplates:
+  - metadata:
+      name: pgdata
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi

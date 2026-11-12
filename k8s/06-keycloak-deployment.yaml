@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: sbdt-uts
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:26.8.2
+        args:
+        - start-dev
+        - --import-realm
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: KC_BOOTSTRAP_ADMIN_USERNAME
+          value: admin
+        - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sbdt-secrets
+              key: KEYCLOAK_ADMIN_PASSWORD
+        - name: KC_HOSTNAME
+          value: http://auth.lokal
+        - name: KC_HTTP_ENABLED
+          value: 'true'
+        volumeMounts:
+        - name: realm
+          mountPath: /opt/keycloak/data/import
+          readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 15
+        resources:
+          requests:
+            cpu: 200m
+            memory: 600Mi
+          limits:
+            memory: 1200Mi
+      volumes:
+      - name: realm
+        configMap:
+          name: keycloak-realm

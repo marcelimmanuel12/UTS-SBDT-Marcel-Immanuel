@@ -1,0 +1,16 @@
+digraph SBDT {
+  graph [bgcolor="white", rankdir=LR, pad="0.24", nodesep="0.45", ranksep="0.65", fontname="Times New Roman"];
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#555555", penwidth=1.4, fontname="Times New Roman", fontsize=12];
+  edge [color="#3B3B3B", fontname="Times New Roman", fontsize=10];
+  User [label="Pengguna / Klien"];
+  Keycloak [label="Keycloak\nSSO / OIDC"];
+  API [label="FastAPI\nJWT + Model ML"];
+  Primary [shape=cylinder, label="PostgreSQL\nPRIMARY (write)"];
+  Replica [shape=cylinder, label="PostgreSQL\nREPLICA (read)"];
+  User -> Keycloak [label="login / JWT"];
+  User -> API [label="POST /predict\nGET /inferences"];
+  API -> Keycloak [label="JWKS"];
+  API -> Primary [label="INSERT"];
+  API -> Replica [label="SELECT"];
+  Primary -> Replica [label="streaming WAL\nasynchronous", style="dashed"];
+}

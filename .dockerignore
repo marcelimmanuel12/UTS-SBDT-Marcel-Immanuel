@@ -1,0 +1,8 @@
+__pycache__/
+.git/
+.env
+.venv/
+*.pyc
+*.pdf
+*.docx
+models/

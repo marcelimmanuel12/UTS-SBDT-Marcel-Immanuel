@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-init
+  namespace: sbdt-uts
+data:
+  01-init-primary.sh: "#!/bin/sh\nset -eu\n# Untuk laboratorium lokal; produksi batasi alamat client\
+    \ di pg_hba.conf.\nprintf '%s\\n' 'host replication replicator 0.0.0.0/0 scram-sha-256' >> \"\
+    $PGDATA/pg_hba.conf\"\npsql -v ON_ERROR_STOP=1 --username \"$POSTGRES_USER\" --dbname \"$POSTGRES_DB\"\
+    \ \\\n  -v rep_pass=\"$REPLICATION_PASSWORD\" <<'SQL'\nSELECT format('CREATE ROLE replicator\
+    \ WITH REPLICATION LOGIN PASSWORD %L', :'rep_pass') \\gexec\nSQL\n"
+  02-schema.sql: "CREATE TABLE IF NOT EXISTS inference_history (\n    id BIGSERIAL PRIMARY KEY,\n\
+    \    username TEXT NOT NULL,\n    transaction_amount DOUBLE PRECISION NOT NULL CHECK (transaction_amount\
+    \ > 0),\n    transactions_24h INTEGER NOT NULL CHECK (transactions_24h >= 0),\n    new_device\
+    \ BOOLEAN NOT NULL,\n    risk_probability DOUBLE PRECISION NOT NULL CHECK (risk_probability BETWEEN\
+    \ 0 AND 1),\n    risk_label TEXT NOT NULL CHECK (risk_label IN ('tinggi', 'rendah')),\n    created_at\
+    \ TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\nCREATE INDEX IF NOT EXISTS idx_inference_user_created\
+    \ ON inference_history(username, created_at DESC);\n"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: replica-init
+  namespace: sbdt-uts
+data:
+  start-replica.sh: "#!/bin/sh\nset -eu\n: \"${PGDATA:=/var/lib/postgresql/data/pgdata}\"\n: \"${REPLICATION_PASSWORD:?REPLICATION_PASSWORD\
+    \ harus diisi}\"\nmkdir -p \"$PGDATA\"\nchown -R postgres:postgres \"$PGDATA\"\nchmod 700 \"\
+    $PGDATA\"\nexport PGPASSWORD=\"$REPLICATION_PASSWORD\"\nif [ ! -s \"$PGDATA/PG_VERSION\" ]; then\n\
+    \  echo \"Menunggu primary untuk basebackup...\"\n  until pg_isready -h postgres-primary -p 5432\
+    \ -U sbdt >/dev/null 2>&1; do sleep 2; done\n  # pg_basebackup -R menulis standby.signal dan\
+    \ primary_conninfo.\n  su-exec postgres pg_basebackup -h postgres-primary -p 5432 -U replicator\
+    \ \\\n    -D \"$PGDATA\" -F p -X stream -R -w\nfi\nexec su-exec postgres postgres -D \"$PGDATA\"\
+    \ -c hot_standby=on\n"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  namespace: sbdt-uts
+data:
+  realm-sbdt.json: "{\n  \"realm\": \"sbdt\",\n  \"enabled\": true,\n  \"displayName\": \"SBDT UTS\
+    \ Demo\",\n  \"sslRequired\": \"none\",\n  \"clients\": [\n    {\n      \"clientId\": \"api-service\"\
+    ,\n      \"name\": \"API Resource Server\",\n      \"enabled\": true,\n      \"protocol\": \"\
+    openid-connect\",\n      \"bearerOnly\": true\n    },\n    {\n      \"clientId\": \"sbdt-cli\"\
+    ,\n      \"name\": \"SBDT CLI Demo\",\n      \"enabled\": true,\n      \"protocol\": \"openid-connect\"\
+    ,\n      \"publicClient\": true,\n      \"standardFlowEnabled\": true,\n      \"directAccessGrantsEnabled\"\
+    : true,\n      \"redirectUris\": [\n        \"http://localhost:*/*\",\n        \"http://127.0.0.1:*/*\"\
+    \n      ],\n      \"webOrigins\": [\n        \"+\"\n      ],\n      \"protocolMappers\": [\n\
+    \        {\n          \"name\": \"api-service-audience\",\n          \"protocol\": \"openid-connect\"\
+    ,\n          \"protocolMapper\": \"oidc-audience-mapper\",\n          \"consentRequired\": false,\n\
+    \          \"config\": {\n            \"included.client.audience\": \"api-service\",\n      \
+    \      \"access.token.claim\": \"true\",\n            \"id.token.claim\": \"false\"\n       \
+    \   }\n        }\n      ]\n    }\n  ],\n  \"users\": [\n    {\n      \"username\": \"marcel\"\
+    ,\n      \"enabled\": true,\n      \"emailVerified\": true,\n      \"firstName\": \"Marcel\"\
+    ,\n      \"lastName\": \"Immanuel\",\n      \"email\": \"marcel@sbdt.test\",\n      \"credentials\": [\n        {\n          \"type\"\
+    : \"password\",\n          \"value\": \"Demo12345!\",\n          \"temporary\": false\n     \
+    \   }\n      ]\n    }\n  ]\n}\n"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: sbdt-uts
+data:
+  DB_USER: sbdt
+  DB_NAME: sbdt
+  DB_PRIMARY_HOST: postgres-primary
+  DB_REPLICA_HOST: postgres-replica
+  OIDC_ISSUER: http://auth.lokal/realms/sbdt
+  OIDC_JWKS_URL: http://keycloak:8080/realms/sbdt/protocol/openid-connect/certs
+  OIDC_AUDIENCE: api-service

@@ -1,0 +1,61 @@
+{
+  "realm": "sbdt",
+  "enabled": true,
+  "displayName": "SBDT UTS Demo",
+  "sslRequired": "none",
+  "clients": [
+    {
+      "clientId": "api-service",
+      "name": "API Resource Server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true
+    },
+    {
+      "clientId": "sbdt-cli",
+      "name": "SBDT CLI Demo",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "protocolMappers": [
+        {
+          "name": "api-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "api-service",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "marcel",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Marcel",
+      "lastName": "Immanuel",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Demo12345!",
+          "temporary": false
+        }
+      ],
+      "email": "marcel@sbdt.test"
+    }
+  ]
+}

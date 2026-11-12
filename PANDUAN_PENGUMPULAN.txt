@@ -1,0 +1,22 @@
+PANDUAN PENGUMPULAN BAGIAN III UTS SBDT
+Marcel Immanuel - 20240801117
+
+Dosen meminta dua luaran wajib:
+1) Repositori Git berisi source code, Dockerfile, skrip database, dan manifests Kubernetes.
+2) Laporan proyek format PDF, termasuk screenshot eksekusi aplikasi dan bukti pengujian.
+
+Tersedia pada ZIP:
+- Source code siap dicoba: API FastAPI + model ML contoh + PostgreSQL Primary/Replica + Keycloak SSO.
+- Docker Compose, Kubernetes manifests, uji unit, diagram, petunjuk README.
+- Laporan teknis PDF REVISI: docs/Laporan_Teknis_SBDT_Bagian_III_Marcel_Immanuel.pdf
+- Panduan eksekusi Mac pemula: PANDUAN_MAC_PEMULA.md
+
+BELUM SELESAI UNTUK PENGUMPULAN:
+- Jalankan Docker Compose dan Kubernetes pada komputer dengan Docker + kubectl.
+- Ambil screenshot login SSO, JWT, routing read/write, PVC tetap setelah Pod restart,
+  service dan Ingress, serta status streaming PostgreSQL.
+- Tempelkan screenshot asli pada laporan PDF (lakukan edit pada laporan Word bila perlu).
+- Unggah folder ke GitHub atau server Git lain dan salin URL repo yang benar.
+
+Nama/password dalam berkas proyek adalah dummy untuk belajar, jangan dipakai dalam produksi.
+Tidak ada klaim bahwa Kubernetes/Docker telah diuji dan berjalan di lingkungan penyusun.

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-replica
+  namespace: sbdt-uts
+spec:
+  serviceName: postgres-replica-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-replica
+  template:
+    metadata:
+      labels:
+        app: postgres-replica
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        command:
+        - /bin/sh
+        - /scripts/start-replica.sh
+        env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: REPLICATION_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sbdt-secrets
+              key: REPLICATION_PASSWORD
+        volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+        - name: replica-init
+          mountPath: /scripts
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U sbdt -d sbdt
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 768Mi
+      volumes:
+      - name: replica-init
+        configMap:
+          name: replica-init
+          defaultMode: 493
+  volumeClaimTemplates:
+  - metadata:
+      name: pgdata
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
